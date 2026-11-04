@@ -201,34 +201,30 @@ export async function registerAdminRoutes(app: import("fastify").FastifyInstance
   }));
 
   // ==================== TENANTS (super_admin only) ====================
-  app.get("/api/tenants", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req: FastifyRequest, reply: FastifyReply) => {
-    // Super admin can see all tenants — use pool directly without tenant context
-    const { pool } = await import("../db/pool.js");
-    const { rows } = await pool.query("SELECT * FROM tenants ORDER BY created_at DESC");
+  app.get("/api/tenants", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (_req, reply, client) => {
+    const { rows } = await client.query("SELECT * FROM tenants ORDER BY created_at DESC");
     return reply.send(rows);
-  });
+  }));
 
-  app.put("/api/tenants/:id/subscription", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req: FastifyRequest, reply: FastifyReply) => {
+  app.put("/api/tenants/:id/subscription", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (req, reply, client) => {
     const { id } = req.params as { id: string };
     const { plan, status, expires_at } = req.body as any;
-    const { pool } = await import("../db/pool.js");
-    const { rows } = await pool.query(
+    const { rows } = await client.query(
       "UPDATE tenants SET plan=$1, status=$2, expires_at=$3, updated_at=now() WHERE id=$4 RETURNING *",
       [plan, status, expires_at, id]
     );
     if (rows.length === 0) return reply.code(404).send({ error: "Tenant not found" });
     return reply.send(rows[0]);
-  });
+  }));
 
-  app.post("/api/tenants/:id/payments", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/tenants/:id/payments", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (req, reply, client) => {
     const { id } = req.params as { id: string };
     const { amount, currency, payment_method } = req.body as any;
     const user = (req as any).user;
-    const { pool } = await import("../db/pool.js");
-    const { rows } = await pool.query(
+    const { rows } = await client.query(
       "INSERT INTO payments (tenant_id, amount, currency, payment_method, recorded_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [id, amount, currency || "EUR", payment_method, user.userId]
     );
     return reply.code(201).send(rows[0]);
-  });
+  }));
 }
