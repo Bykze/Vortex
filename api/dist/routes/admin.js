@@ -136,7 +136,7 @@ export async function registerAdminRoutes(app) {
         return reply.code(204).send();
     }));
     // ==================== TENANT SETTINGS (super_admin only) ====================
-    app.get("/api/tenant-settings", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+    app.get("/api/tenant-settings", { preHandler: [app.auth, app.requireRole("super_admin", "direction", "staff")] }, tenantHandler(async (req, reply, client) => {
         const user = req.user;
         const { rows } = await client.query("SELECT * FROM tenant_settings WHERE tenant_id = $1", [user.tenantId]);
         return reply.send(rows[0] || {});
@@ -158,28 +158,24 @@ export async function registerAdminRoutes(app) {
         return reply.send(rows[0]);
     }));
     // ==================== TENANTS (super_admin only) ====================
-    app.get("/api/tenants", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req, reply) => {
-        // Super admin can see all tenants — use pool directly without tenant context
-        const { pool } = await import("../db/pool.js");
-        const { rows } = await pool.query("SELECT * FROM tenants ORDER BY created_at DESC");
+    app.get("/api/tenants", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (_req, reply, client) => {
+        const { rows } = await client.query("SELECT * FROM tenants ORDER BY created_at DESC");
         return reply.send(rows);
-    });
-    app.put("/api/tenants/:id/subscription", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req, reply) => {
+    }));
+    app.put("/api/tenants/:id/subscription", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (req, reply, client) => {
         const { id } = req.params;
         const { plan, status, expires_at } = req.body;
-        const { pool } = await import("../db/pool.js");
-        const { rows } = await pool.query("UPDATE tenants SET plan=$1, status=$2, expires_at=$3, updated_at=now() WHERE id=$4 RETURNING *", [plan, status, expires_at, id]);
+        const { rows } = await client.query("UPDATE tenants SET plan=$1, status=$2, expires_at=$3, updated_at=now() WHERE id=$4 RETURNING *", [plan, status, expires_at, id]);
         if (rows.length === 0)
             return reply.code(404).send({ error: "Tenant not found" });
         return reply.send(rows[0]);
-    });
-    app.post("/api/tenants/:id/payments", { preHandler: [app.auth, app.requireRole("super_admin")] }, async (req, reply) => {
+    }));
+    app.post("/api/tenants/:id/payments", { preHandler: [app.auth, app.requireRole("super_admin")] }, tenantHandler(async (req, reply, client) => {
         const { id } = req.params;
         const { amount, currency, payment_method } = req.body;
         const user = req.user;
-        const { pool } = await import("../db/pool.js");
-        const { rows } = await pool.query("INSERT INTO payments (tenant_id, amount, currency, payment_method, recorded_by) VALUES ($1, $2, $3, $4, $5) RETURNING *", [id, amount, currency || "EUR", payment_method, user.userId]);
+        const { rows } = await client.query("INSERT INTO payments (tenant_id, amount, currency, payment_method, recorded_by) VALUES ($1, $2, $3, $4, $5) RETURNING *", [id, amount, currency || "EUR", payment_method, user.userId]);
         return reply.code(201).send(rows[0]);
-    });
+    }));
 }
 //# sourceMappingURL=admin.js.map

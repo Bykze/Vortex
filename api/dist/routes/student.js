@@ -1,28 +1,36 @@
 import { tenantHandler } from "../middleware/tenant.js";
+import { isTeacher, assertTeacherOwnsClassSubject, assertTeacherCanSeeStudent } from "../lib/teacherScope.js";
 export async function registerStudentRoutes(app) {
     // ==================== STUDENTS (Registry) ====================
     app.get("/api/students", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { class_id, status, search } = req.query;
         let q = "SELECT * FROM students WHERE 1=1";
         const params = [];
         if (class_id) {
             params.push(class_id);
-            q += ` AND class_id = $${params.length}`;
+            q += ` AND class_id = ${params.length}`;
         }
         if (status) {
             params.push(status);
-            q += ` AND status = $${params.length}`;
+            q += ` AND status = ${params.length}`;
         }
         if (search) {
             params.push(`%${search}%`);
-            q += ` AND (first_name ILIKE $${params.length} OR last_name ILIKE $${params.length} OR matricule ILIKE $${params.length})`;
+            q += ` AND (first_name ILIKE ${params.length} OR last_name ILIKE ${params.length} OR matricule ILIKE ${params.length})`;
+        }
+        if (isTeacher(user)) {
+            params.push(user.userId);
+            q += ` AND class_id IN (SELECT class_id FROM class_subjects WHERE teacher_id = ${params.length})`;
         }
         q += " ORDER BY last_name, first_name";
         const { rows } = await client.query(q, params);
         return reply.send(rows);
     }));
     app.get("/api/students/:id", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { id } = req.params;
+        await assertTeacherCanSeeStudent(client, user, id);
         const { rows } = await client.query("SELECT * FROM students WHERE id=$1", [id]);
         if (rows.length === 0)
             return reply.code(404).send({ error: "Student not found" });
@@ -61,13 +69,17 @@ export async function registerStudentRoutes(app) {
     }));
     // Student status history
     app.get("/api/students/:id/status-history", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { id } = req.params;
+        await assertTeacherCanSeeStudent(client, user, id);
         const { rows } = await client.query("SELECT * FROM student_status_history WHERE student_id=$1 ORDER BY changed_at DESC", [id]);
         return reply.send(rows);
     }));
     // ==================== GUARDIANS ====================
     app.get("/api/students/:id/guardians", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { id } = req.params;
+        await assertTeacherCanSeeStudent(client, user, id);
         const { rows } = await client.query("SELECT * FROM guardians WHERE student_id=$1", [id]);
         return reply.send(rows);
     }));
@@ -84,6 +96,7 @@ export async function registerStudentRoutes(app) {
     }));
     // ==================== ENROLLMENTS ====================
     app.get("/api/enrollments", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { student_id, class_subject_id } = req.query;
         let q = `SELECT e.*, cs.class_id, cs.subject_id, s.name as subject_name
              FROM enrollments e
@@ -93,17 +106,24 @@ export async function registerStudentRoutes(app) {
         const params = [];
         if (student_id) {
             params.push(student_id);
-            q += ` AND e.student_id = $${params.length}`;
+            q += ` AND e.student_id = ${params.length}`;
         }
         if (class_subject_id) {
             params.push(class_subject_id);
-            q += ` AND e.class_subject_id = $${params.length}`;
+            q += ` AND e.class_subject_id = ${params.length}`;
+        }
+        if (isTeacher(user)) {
+            params.push(user.userId);
+            q += ` AND cs.teacher_id = ${params.length}`;
         }
         const { rows } = await client.query(q, params);
         return reply.send(rows);
     }));
     app.post("/api/enrollments", { preHandler: [app.auth, app.requireRole("super_admin", "direction", "staff", "teacher")] }, tenantHandler(async (req, reply, client) => {
+        const user = req.user;
         const { student_id, class_subject_id, academic_year_id } = req.body;
+        await assertTeacherOwnsClassSubject(client, user, class_subject_id);
+        await assertTeacherCanSeeStudent(client, user, student_id);
         const { rows } = await client.query("INSERT INTO enrollments (tenant_id, student_id, class_subject_id, academic_year_id) VALUES (current_tenant_id(), $1, $2, $3) RETURNING *", [student_id, class_subject_id, academic_year_id]);
         return reply.code(201).send(rows[0]);
     }));

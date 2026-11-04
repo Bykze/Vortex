@@ -175,7 +175,7 @@ export async function registerAdminRoutes(app: import("fastify").FastifyInstance
   }));
 
   // ==================== TENANT SETTINGS (super_admin only) ====================
-  app.get("/api/tenant-settings", { preHandler: [app.auth] }, tenantHandler(async (req, reply, client) => {
+  app.get("/api/tenant-settings", { preHandler: [app.auth, app.requireRole("super_admin","direction","staff")] }, tenantHandler(async (req, reply, client) => {
     const user = (req as any).user;
     const { rows } = await client.query("SELECT * FROM tenant_settings WHERE tenant_id = $1", [user.tenantId]);
     return reply.send(rows[0] || {});

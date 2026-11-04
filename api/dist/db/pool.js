@@ -22,8 +22,8 @@ export async function withTenant(tenantId, role, fn) {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
-        await client.query(`SET LOCAL app.tenant_id = '${tenantId ?? ""}'`);
-        await client.query(`SET LOCAL app.role = '${role}'`);
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId ?? ""]);
+        await client.query("SELECT set_config('app.role', $1, true)", [role]);
         const result = await fn(client);
         await client.query("COMMIT");
         return result;

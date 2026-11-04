@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { PageHeader, Spinner, ErrorBanner, EmptyState, Modal, Badge } from "@/components/ui";
 import { Plus, Lock, Unlock, Pencil, Trash2, Save } from "lucide-react";
 import type { GradeItem, Grade, ClassSubject } from "@/types";
@@ -18,6 +19,8 @@ export default function GradesPage() {
   const [gradeValues, setGradeValues] = useState<Record<string, string>>({});
   const [students, setStudents] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const canReopen = user?.role === "direction" || user?.role === "super_admin";
 
   useEffect(() => {
     api.get("/api/class-subjects").then((d) => { setClassSubjects(d); if (d.length > 0) setSelectedCS(d[0].id); setLoading(false); })
@@ -56,13 +59,17 @@ export default function GradesPage() {
   }
 
   async function toggleClose(item: GradeItem) {
-    if (item.period_closed) {
-      await api.post(`/api/grade-items/${item.id}/reopen`);
-    } else {
-      await api.post(`/api/grade-items/${item.id}/close`);
-    }
-    const gi = await api.get(`/api/grade-items?class_subject_id=${selectedCS}`);
-    setItems(gi);
+    if (item.period_closed && !canReopen) return;
+    setError(null);
+    try {
+      if (item.period_closed) {
+        await api.post(`/api/grade-items/${item.id}/reopen`);
+      } else {
+        await api.post(`/api/grade-items/${item.id}/close`);
+      }
+      const gi = await api.get(`/api/grade-items?class_subject_id=${selectedCS}`);
+      setItems(gi);
+    } catch (e: any) { setError(e.message); }
   }
 
   async function deleteItem(id: string) {
@@ -137,7 +144,7 @@ export default function GradesPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => openGradesModal(item)} className="px-3 py-1.5 text-xs font-medium bg-slate-100 rounded-lg hover:bg-slate-200">Saisir</button>
-                        <button onClick={() => toggleClose(item)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">{item.period_closed ? <Unlock size={16} /> : <Lock size={16} />}</button>
+                        <button onClick={() => toggleClose(item)} disabled={item.period_closed && !canReopen} title={item.period_closed && !canReopen ? "Seule la direction peut rouvrir ces notes" : item.period_closed ? "Rouvrir les notes" : "Envoyer les notes à l'administration"} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent">{item.period_closed ? <Unlock size={16} /> : <Lock size={16} />}</button>
                         <button onClick={() => deleteItem(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-600"><Trash2 size={16} /></button>
                       </div>
                     </td>
