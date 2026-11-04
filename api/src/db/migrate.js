@@ -1,3 +1,4 @@
+import "../env.js";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { pool } from "./pool.js";
@@ -15,7 +16,7 @@ export async function runMigrations() {
   `);
 
   const { rows } = await pool.query("SELECT filename FROM _migrations");
-  const applied = new Set(rows.map((r: { filename: string }) => r.filename));
+  const applied = new Set(rows.map((r) => r.filename));
 
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))

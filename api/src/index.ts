@@ -1,3 +1,4 @@
+import "./env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { authMiddleware, requireRole } from "./middleware/auth.js";

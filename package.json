@@ -9,7 +9,7 @@
     "dev:web": "npm --prefix web run dev",
     "build": "npm --prefix web install && npm --prefix web run build",
     "start": "npm --prefix api run start",
-    "db:migrate": "node api/src/db/migrate.js",
+    "db:migrate": "npm --prefix api run migrate",
     "db:seed": "node db/seed/index.js",
     "db:test:isolation": "node db/seed/test-isolation.js",
     "install:all": "npm --prefix api install && npm --prefix web install"
