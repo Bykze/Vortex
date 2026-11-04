@@ -7,7 +7,7 @@
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm --prefix api run dev",
     "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix web run build",
+    "build": "npm --prefix web install && npm --prefix web run build",
     "start": "npm --prefix api run start",
     "db:migrate": "node api/src/db/migrate.js",
     "db:seed": "node db/seed/index.js",
