@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { pool } from "../db/pool.js";
-import { signAccessToken, signRefreshToken, type JwtPayload } from "../middleware/auth.js";
+import { signAccessToken, signRefreshToken, verifyRefreshToken, authMiddleware, type JwtPayload } from "../middleware/auth.js";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { publicHandler } from "../middleware/tenant.js";
 
@@ -101,6 +101,7 @@ export async function registerRoutes(app: import("fastify").FastifyInstance) {
           [tenantId, tenantName]
         );
       } else {
+        await client.query("ROLLBACK");
         return reply.code(400).send({ error: "tenantName and tenantSlug required for signup" });
       }
 
@@ -122,7 +123,7 @@ export async function registerRoutes(app: import("fastify").FastifyInstance) {
         user: { id: ur[0].id, email: ur[0].email, fullName: ur[0].full_name, role: ur[0].role, tenantId },
       });
     } catch (err: any) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch(() => {});
       if (err.code === "23505") {
         return reply.code(409).send({ error: "Email already registered in this tenant" });
       }
@@ -137,20 +138,22 @@ export async function registerRoutes(app: import("fastify").FastifyInstance) {
     const { refreshToken } = req.body as { refreshToken: string };
     if (!refreshToken) return reply.code(400).send({ error: "refreshToken required" });
 
-    let payload: JwtPayload;
+    let decoded: JwtPayload;
     try {
-      payload = (await import("jsonwebtoken")).verify(refreshToken, process.env.JWT_REFRESH_SECRET || "dev_refresh_change_me") as JwtPayload;
+      decoded = verifyRefreshToken(refreshToken);
     } catch {
       return reply.code(401).send({ error: "Invalid refresh token" });
     }
 
-    const accessToken = signAccessToken(payload);
+    const accessToken = signAccessToken({
+      userId: decoded.userId, tenantId: decoded.tenantId, role: decoded.role, email: decoded.email,
+    });
     return reply.send({ accessToken });
   }));
 
   // ME (get current user info)
   app.get("/api/auth/me", {
-    preHandler: [requireAuth],
+    preHandler: [authMiddleware],
   }, async (req: FastifyRequest, reply: FastifyReply) => {
     const user = (req as any).user as JwtPayload;
     return reply.send({
@@ -159,5 +162,3 @@ export async function registerRoutes(app: import("fastify").FastifyInstance) {
   });
 }
 
-// Lazy import to avoid circular dependency
-import { authMiddleware as requireAuth } from "../middleware/auth.js";

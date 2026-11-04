@@ -353,19 +353,13 @@ CREATE TRIGGER trg_immutable_users BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION block_immutable_update();
 
 DROP TRIGGER IF EXISTS trg_immutable_students ON students;
-CREATE TRIGGER IF NOT EXISTS trg_immutable_students_matricule BEFORE UPDATE ON students
-  FOR EACH ROW WHEN (NEW.matricule IS DISTINCT FROM OLD.matricule)
-  EXECUTE FUNCTION raise_immutable('matricule');
-
--- We need a simpler function for per-column immutability
 CREATE OR REPLACE FUNCTION raise_immutable(col_name text)
-RETURNS trigger AS $$
+RETURNS trigger AS $
 BEGIN
   RAISE EXCEPTION '% is immutable', col_name;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql;
 
--- Replace the students trigger with the correct approach
 DROP TRIGGER IF EXISTS trg_immutable_students ON students;
 DROP TRIGGER IF EXISTS trg_immutable_students_matricule ON students;
 CREATE TRIGGER trg_immutable_students BEFORE UPDATE ON students
@@ -514,7 +508,7 @@ ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
-ALTER TABLE guardians ENABLE RLOCK LEVEL SECURITY;
+ALTER TABLE guardians ENABLE ROW LEVEL SECURITY;
 ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grade_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grades ENABLE ROW LEVEL SECURITY;
