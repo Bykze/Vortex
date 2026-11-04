@@ -353,12 +353,12 @@ CREATE TRIGGER trg_immutable_users BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION block_immutable_update();
 
 DROP TRIGGER IF EXISTS trg_immutable_students ON students;
-CREATE OR REPLACE FUNCTION raise_immutable(col_name text)
-RETURNS trigger AS $
+CREATE OR REPLACE FUNCTION raise_immutable()
+RETURNS trigger AS $$
 BEGIN
-  RAISE EXCEPTION '% is immutable', col_name;
+  RAISE EXCEPTION '% is immutable', TG_ARGV[0];
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_immutable_students ON students;
 DROP TRIGGER IF EXISTS trg_immutable_students_matricule ON students;
