@@ -7,14 +7,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantSlug, setTenantSlug] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setLoading(true);
-    const { error } = await login(email, password, tenantSlug || undefined);
+    const { error } = await login(email, password);
     setLoading(false);
     if (error) setError(error); else navigate("/dashboard");
   }
@@ -37,11 +36,6 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
             <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="••••••••" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Slug école (optionnel)</label>
-            <input type="text" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="mon-ecole" />
           </div>
           {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
           <button type="submit" disabled={loading}
